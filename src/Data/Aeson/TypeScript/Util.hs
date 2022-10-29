@@ -148,9 +148,11 @@ mkInstance = InstanceD Nothing
 mkInstance = InstanceD
 #endif
 
-namesAndTypes :: Options -> [(Name, (Suffix, Var))] -> ConstructorInfo -> [(String, Type)]
-namesAndTypes options genericVariables ci = case constructorVariant ci of
-  RecordConstructor names -> zip (fmap ((fieldLabelModifier options) . lastNameComponent') names) (constructorFields ci)
+namesAndTypes :: ExtraTypeScriptOptions -> Options -> [(Name, (Suffix, Var))] -> ConstructorInfo -> [(String, Type)]
+namesAndTypes extraOptions options genericVariables ci = case constructorVariant ci of
+  RecordConstructor names -> fmap (\(recordFieldName, t) -> (fieldLabelModifier options recordFieldName, t)) 
+                               $ filter (\(recordFieldName, _) -> recordFieldName `notElem` omitFields extraOptions) 
+                               $ zip (fmap lastNameComponent' names) (constructorFields ci)                         
   _ -> case sumEncoding options of
     TaggedObject _ contentsFieldName
       | isConstructorNullary ci -> []
@@ -159,6 +161,9 @@ namesAndTypes options genericVariables ci = case constructorVariant ci of
 
 constructorNameToUse :: Options -> ConstructorInfo -> String
 constructorNameToUse options ci = (constructorTagModifier options) $ lastNameComponent' (constructorName ci)
+
+dropIndicies :: [Int] -> [a] -> [a]
+dropIndicies indiciesToDrop = fmap snd . filter (\(i, a) -> i `notElem` indiciesToDrop) . zip [0..]
 
 -- | Get the type of a tuple of constructor fields, as when we're packing a record-less constructor into a list
 contentsTupleType :: ConstructorInfo -> Type
